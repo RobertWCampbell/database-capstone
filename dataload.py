@@ -84,8 +84,10 @@ memberKeys = ('memberId', 'parentMemberId', 'memberNameEn', 'memberNameFr', 'ter
 user = os.getenv("POSTGRES_USER")
 password = os.getenv("POSTGRES_PASSWORD")
 db = os.getenv("POSTGRES_DB")
+print(db)
 #engine = create_engine(f"postgresql+psycopg://{user}:{password}@db:5432/{db}")
 conn_str = f"postgresql://{user}:{password}@db:5432/{db}"
+
 with psycopg.connect(conn_str) as conn:
         with conn.cursor() as cur:
             
@@ -94,7 +96,7 @@ with psycopg.connect(conn_str) as conn:
                         DROP TABLE IF EXISTS load.Dimensions;
                         DROP TABLE IF EXISTS load.Members;
 
-                        CREATE TABLE Cubemeta (
+                        CREATE TABLE load.Cubemeta (
                             productId INTEGER PRIMARY KEY, 
                             cubeTitleEn TEXT, 
                             cubeTitleFr TEXT, 
@@ -103,13 +105,13 @@ with psycopg.connect(conn_str) as conn:
                             releaseTime TIMESTAMP
                         );
 
-                        CREATE TABLE Dimensions (
+                        CREATE TABLE load.Dimensions (
                             dimensionPositionId INTEGER PRIMARY KEY, 
                             dimensionNameEn TEXT, 
                             dimensionNameFr TEXT
                         );
 
-                        CREATE TABLE Members (
+                        CREATE TABLE load.Members (
                             dimensionPositionId INTEGER, 
                             memberId INTEGER, 
                             parentMemberId INTEGER, 
@@ -137,16 +139,18 @@ with psycopg.connect(conn_str) as conn:
 
                 dd = tuple(d[k] for k in dimKeys)
 
-                dimensionPositionId = d['dimensionPostionId']
+                #dimensionPositionId = d['dimensionPostionId']
+                dimensionPositionId = int(dd[0])
+                print(dimensionPositionId)
 
                 cur.execute('''INSERT INTO load.Dimensions (dimensionPositionId, dimensionNameEn, dimensionNameFr)
-                                VALUES ( %s, %s, %s )''', dimKeys)
+                                VALUES ( %s, %s, %s )''', dd)
 
-                for m in d['members']:
+                for m in d['member']:
                     mm = (dimensionPositionId,) +  tuple(m[k] for k in memberKeys)
 
                     cur.execute('''INSERT INTO load.Members (
                                     dimensionPositionId, memberId, parentMemberId, memberNameEn, memberNameFr, terminated)
-                                    VALUES ( %s, %s, %s, %s, %s, %s )''', memberKeys)
+                                    VALUES ( %s, %s, %s, %s, %s, %s )''', mm)
 
             conn.commit()
