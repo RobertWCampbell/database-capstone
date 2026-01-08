@@ -2,7 +2,7 @@
 
 # import packages
 import os
-import psycopg3
+import psycopg
 import re
 import urllib.request, urllib.parse, urllib.error
 import http
@@ -78,11 +78,6 @@ tblKeys = ('productId', 'cubeTitleEn', 'cubeTitleFr', 'cubeStartDate', 'cubeEndD
 dimKeys = ('dimensionPositionId', 'dimensionNameEn', 'dimensionNameFr')
 memberKeys = ('memberId', 'parentMemberId', 'memberNameEn', 'memberNameFr', 'terminated')
 
-tblmeta = tuple(data[k] for k in tblKeys)
-
-cur.execute('''INSERT INTO load.Cube (productId, cubeTitleEn, cubeTitleFr, cubeStartDate, cubeEndDate, releaseTime)
-                    VALUES ( ?, ?, ?, ?, ?, ? )''', tblKeys)
-
 # -------------------------------------------------------------------
 # Database connection and prep the staging area for data loading
 # -------------------------------------------------------------------
@@ -95,11 +90,11 @@ with psycopg.connect(conn_str) as conn:
         with conn.cursor() as cur:
             
             cur.execute('''
-                        DROP TABLE IF EXISTS load.Cube;
+                        DROP TABLE IF EXISTS load.Cubemeta;
                         DROP TABLE IF EXISTS load.Dimensions;
                         DROP TABLE IF EXISTS load.Members;
 
-                        CREATE TABLE Cube (
+                        CREATE TABLE Cubemeta (
                             productId INTEGER PRIMARY KEY, 
                             cubeTitleEn TEXT, 
                             cubeTitleFr TEXT, 
@@ -120,13 +115,23 @@ with psycopg.connect(conn_str) as conn:
                             parentMemberId INTEGER, 
                             memberNameEn TEXT, 
                             memberNameFr TEXT, 
-                            terminated INTEGER) 
+                            terminated INTEGER, 
 
                             PRIMARY KEY(dimensionPositionId, memberId)
                         );
 
                         ''')
+            conn.commit()
+            
+with psycopg.connect(conn_str) as conn:
+        with conn.cursor() as cur:
+            
+            tblmeta = tuple(data[k] for k in tblKeys)
+            print(tblKeys)
+            print(tblmeta)
 
+            cur.execute('''INSERT INTO load.Cubemeta (productId, cubeTitleEn, cubeTitleFr, cubeStartDate, cubeEndDate, releaseTime)
+                                VALUES ( %s, %s, %s, %s, %s, %s )''', tblmeta)
 
             for d in data['dimension']:
 
@@ -135,11 +140,13 @@ with psycopg.connect(conn_str) as conn:
                 dimensionPositionId = d['dimensionPostionId']
 
                 cur.execute('''INSERT INTO load.Dimensions (dimensionPositionId, dimensionNameEn, dimensionNameFr)
-                                VALUES ( ?, ?, ? )''', dimKeys)
+                                VALUES ( %s, %s, %s )''', dimKeys)
 
                 for m in d['members']:
                     mm = (dimensionPositionId,) +  tuple(m[k] for k in memberKeys)
 
-                cur.execute('''INSERT INTO load.Members (dimensionPositionId, memberId, parentMemberId, memberNameEn, memberNameFr, terminated)
-                                VALUES ( ?, ?, ?, ?, ?, ? )''', memberKeys)
+                    cur.execute('''INSERT INTO load.Members (
+                                    dimensionPositionId, memberId, parentMemberId, memberNameEn, memberNameFr, terminated)
+                                    VALUES ( %s, %s, %s, %s, %s, %s )''', memberKeys)
 
+            conn.commit()
