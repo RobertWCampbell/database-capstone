@@ -76,7 +76,7 @@ with urllib.request.urlopen(req) as uh:
 # make tuples of the items I would like to capture from the metadata table
 tblKeys = ('productId', 'cubeTitleEn', 'cubeTitleFr', 'cubeStartDate', 'cubeEndDate', 'releaseTime')
 dimKeys = ('dimensionPositionId', 'dimensionNameEn', 'dimensionNameFr')
-memberKeys = ('memberId', 'parentMemberId', 'memberNameEn', 'memberNameFr', 'terminated')
+memberKeys = ('memberId', 'classificationCode', 'parentMemberId', 'memberNameEn', 'memberNameFr', 'terminated')
 
 # -------------------------------------------------------------------
 # Database connection and prep the staging area for data loading
@@ -114,6 +114,7 @@ with psycopg.connect(conn_str) as conn:
                         CREATE TABLE load.Members (
                             dimensionPositionId INTEGER, 
                             memberId INTEGER, 
+                            classificationCode, TEXT
                             parentMemberId INTEGER, 
                             memberNameEn TEXT, 
                             memberNameFr TEXT, 
@@ -150,7 +151,8 @@ with psycopg.connect(conn_str) as conn:
                     mm = (dimensionPositionId,) +  tuple(m[k] for k in memberKeys)
 
                     cur.execute('''INSERT INTO load.Members (
-                                    dimensionPositionId, memberId, parentMemberId, memberNameEn, memberNameFr, terminated)
-                                    VALUES ( %s, %s, %s, %s, %s, %s )''', mm)
+                                        dimensionPositionId, memberId, classificationCode, parentMemberId, 
+                                        memberNameEn, memberNameFr, terminated)
+                                    VALUES ( %s,  %s, %s, %s, %s, %s, %s )''', mm)
 
             conn.commit()
