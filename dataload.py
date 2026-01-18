@@ -114,7 +114,7 @@ with psycopg.connect(conn_str) as conn:
                         CREATE TABLE load.Members (
                             dimensionPositionId INTEGER, 
                             memberId INTEGER, 
-                            classificationCode, TEXT
+                            classificationCode TEXT,
                             parentMemberId INTEGER, 
                             memberNameEn TEXT, 
                             memberNameFr TEXT, 
