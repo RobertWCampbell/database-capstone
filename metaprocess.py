@@ -56,6 +56,14 @@ with psycopg.connect(conn_str) as conn:
                     """)
             tree = cur.fetchall()
 
+
+#######################################################################################
+# dimension hierarchy crawl
+#######################################################################################
+
+#######################################################################################
+# simple crawl through dimension hierarchy
+#######################################################################################
 dim = {} 
 parents={}
 dd=[]
@@ -82,7 +90,6 @@ for k, dd in dim.items():
     updates(dd)
     if len(up) > 1:
         updates(dd)
-    print(up)
 
 print("should be a list of lists...")
 print(dim)
