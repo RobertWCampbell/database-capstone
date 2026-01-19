@@ -1,0 +1,16 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore environment files
+.env
+
+# Ignore data files
+data/
+*.csv
+
+# ignore VIM swap files
+*.swp
+
+# ignore VIM config
+.vimrc
