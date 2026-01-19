@@ -43,14 +43,6 @@ with psycopg.connect(conn_str) as conn:
 
             cur.execute("""
                     SELECT DISTINCT  members.dimensionpositionid, members.memberid, 
-                                members.parentmemberid 
-                            FROM load.memparents as members
-                            WHERE members.isparent is NULL;
-                    """)
-            leaves = cur.fetchall()
-
-            cur.execute("""
-                    SELECT DISTINCT  members.dimensionpositionid, members.memberid, 
                     members.parentmemberid 
                             FROM load.memparents as members;
                     """)
@@ -61,35 +53,93 @@ with psycopg.connect(conn_str) as conn:
 # dimension hierarchy crawl
 #######################################################################################
 
-#######################################################################################
-# simple crawl through dimension hierarchy
-#######################################################################################
-dim = {} 
-parents={}
-dd=[]
+logging.info("Dimension heirarchy structure crawl")
 
-for t in tree:
-    if t[0] not in parents.keys():
-        parents[t[0]]={}
-    parents[t[0]][t[1]]=t[2]
+def makeParent(d: list) -> dict:
+    """
+    Assume list of n tuples of three: dimensionID, memberID, partentID
+    """
+    dim = dict()
+    for dd in d:
+        if dd[0] not in dim:
+            dim[dd[0]]=dict()
+        dim[dd[0]][dd[1]]=dd[2]
+    return dim
 
-for l in leaves:
-    if l[0] not in dim.keys():
-        dim[l[0]]=[]
-    dim[l[0]].append(list(l))
+#parents = makeParent(tree)
 
-def updates(dd):
-    for d in dd:
-        if d[-1] != None:
-            d.append(parents[d[0]][d[-1]])
-            if parents[d[0]][d[-2]] not in up:
-                up.append(parents[d[0]][d[-2]])
+def t2l(d):
+    """Make a list of tuples to a list of lists --> mutable"""
+    ll = list()
+    for dd in d:
+        ll.append(list(dd))
+    return ll
 
-for k, dd in dim.items():
-    up = []
-    updates(dd)
-    if len(up) > 1:
-        updates(dd)
+def findParents(d: list, p: dict) -> list:
+    """Finds the parentage of a member"""
+    pp = list()
+    parentDict = dict()
+    for k in p.keys():
+        parentDict[k] = list()
 
-print("should be a list of lists...")
-print(dim)
+    for dd in d:
+        while dd[-1] != None and p[dd[0]][dd[-1]] != None:
+            dd.append(p[dd[0]][dd[-1]])
+        if dd[-1] == None:
+            dd.append(0)
+        else:
+            dd.append(len(dd)-2)
+        pp.append(dd)
+        if dd[2] not in parentDict[dd[0]]:
+            parentDict[dd[0]].append(dd[2])
+
+    final = list()
+    for ppp in pp:
+        if ppp[1] in parentDict[ppp[0]]:
+            ppp.append(1)
+        else:
+            ppp.append(0)
+        final.append(ppp[:2]+ppp[-2:])
+
+    return final
+
+d = t2l(tree)
+p = makeParent(tree)
+print(p)
+#alldim = findParents(t2l(tree), makeParent(tree))
+alldim = findParents(d, p)
+
+print('sorted:')
+print(sorted(alldim))
+
+
+logging.info("Dimension heirarchy: load new tables")
+with psycopg.connect(conn_str) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DROP TABLE IF EXISTS load.parents;
+                CREATE TABLE load.parents (
+                    dimensionpositionid INTEGER,
+                    memberid INTEGER,
+                    level INTEGER,
+                    isparent INTEGER);
+            """)
+            conn.commit()
+
+            for f in alldim:
+                cur.execute("""
+                            INSERT INTO load.parents (dimensionpositionid, memberid, isparent, level)
+                                VALUES(%s, %s, %s, %s) """, f) 
+
+            conn.commit()
+
+            cur.execute("""
+                    DROP TABLE IF EXISTS load.memparents;
+
+                    CREATE TABLE load.memparents AS SELECT members.*, parents.isparent, parents.level
+                    FROM load.Members LEFT  JOIN load.parents
+                        ON members.memberid = parents.memberid 
+                            AND members.dimensionpositionid = parents.dimensionpositionid;
+                        """)
+            
+            conn.commit()
